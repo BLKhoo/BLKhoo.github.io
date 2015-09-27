@@ -1,0 +1,156 @@
+---
+title       : CAGR Stock
+subtitle    : Identifying the low enough price for positive CAGR stock
+author      : BL Khoo
+job         : shiny app
+framework   : io2012        # {io2012, html5slides, shower, dzslides, ...}
+highlighter : highlight.js  # {highlight.js, prettify, highlight}
+hitheme     : tomorrow      # 
+widgets     : [mathjax]            # {mathjax, quiz, bootstrap}
+mode        : selfcontained # {standalone, draft}
+knit        : slidify::knit2slides
+---
+
+## CAGR and Stock Inflation concept
+
+Stock price in general increase over time if the fundamental is right that is the business is profitable.
+This means that the stock price growth can be modeld as the fundamental stock inflation.
+This would result in the stock prices that can be modeled as $price = 2^t$.
+
+Stock price (TA) then is a technical reflection of the fundamental (FA) and the sentiments and psychology of the market (PA). 
+
+                                      TA = PA + FA
+
+We created or assumed a model where the CAGR trend based on the linear regression is at the neutral or fair growth trend of the FA , which is the fundamental growth of the company. Any residual or error from the neutral CAGR then is considered as part of the PA or market price gyration due to fear or greed. 
+
+The right price to have high probability gain would then be to identify the lowest points , given a line that is still parallel to the neutral regression line.
+
+
+--- .class #id 
+
+## Facilitating the price discovery via  simple shiny app and positive CAGR
+
+The shiny app created is a simple visualization of the app to identify the price low enough based on historical trend and leverage on the linear regression model to do the estimation and use trend line offset.
+This requires the application of the logarithm to the stock price to get  a straight line fit as far as possible particularly for  positive CAGR stock.
+
+<img src=assets/img/shinyapp.png style="width: 750px">
+
+``` {r, echo = FALSE , results=FALSE, warning=FALSE}
+
+library(shiny)
+library(quantmod)
+library(lubridate)
+library(date)
+library(ggplot2)
+library(grid)
+library(scales)
+
+
+getdata <- function(ticker) {
+  
+  symbol <<- ticker
+  stk <<- getSymbols(ticker,auto.assign=FALSE)
+  names(stk)[1] <<-"open"
+  names(stk)[2] <<-"high"
+  names(stk)[3] <<-"low"
+  names(stk)[4] <<-"close"
+  names(stk)[5] <<- "vol"
+  names(stk)[6] <<- "price"
+  sampleTimes <<- index(stk) 
+  stk$year <<- year(index(stk))
+  stk$mth <<- month(index(stk))
+  
+}
+
+```
+
+---
+## Linear regression model on log Price.
+The stock data is obtained from yahoo and consist of the following variables in time series dataset.
+```{r echo=FALSE}
+
+tail(stk,3)
+```
+
+
+a linear regression line is added and anothe offset LM line parallel to the LM line (indicated as black line) is created and allow the line to  shift by offset value. 
+The idea is to have the line shifted to touch the lowest price points at least two of them to idenity the lowest support line.
+
+--- 
+## Plot illustrating the LM and offset LM lines
+``` {r, echo=FALSE,warning=FALSE}
+
+
+
+  
+lplot <- function() 
+{ ggplot( data=stk,aes(x=index(stk),y=price)) +
+    geom_smooth(method="lm",se=FALSE,col="red") +
+    geom_line() + labs(title="Log Price") + xlab("Year") +
+    scale_y_continuous(trans = log2_trans(),
+                       breaks = trans_breaks("log2", function(x) 2^x),
+                       labels = trans_format("log2", math_format(2^.x)))  + ylab( expression(paste("Log"[2],' Price')))
+  
+  }
+getdata("IBM")
+p1 <- lplot()
+
+lmplot <- function(offset=0)
+{ p <- lplot()
+  stk$o <- offset
+  m <- lm(log(stk$price,base=2) ~ index(stk),offset=stk$o)
+  l <- geom_abline(intercept = coef(m)["(Intercept)"], slope = coef(m)["index(stk)"],lwd=1)
+  p + l
+  
+}
+
+p2 <- lmplot(0.6)
+
+
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+  
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+  
+  numPlots = length(plots)
+  
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                     ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+  
+  if (numPlots==1) {
+    print(plots[[1]])
+    
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+    
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+      
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+
+p2
+
+```
+
+
+
+---
+
+## The End
+
+
